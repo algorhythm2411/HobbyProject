@@ -68,7 +68,25 @@ const DilrSetSchema = new mongoose.Schema(
 
     // Questions (typically 4, sometimes 3 or 5 in CAT)
     questions: { type: [QuestionSchema], required: true },
-
+    // Optional image stored in Supabase
+    image: {
+      provider: {
+        type: String,
+        default: "supabase",
+      },
+      url: {
+        type: String,
+        default: null,
+      },
+      path: {
+        type: String,
+        default: null,
+      },
+      alt: {
+        type: String,
+        default: "",
+      },
+    },
     // ── Community stats ────────────────────────────────────────────────────────
     timesAttempted: { type: Number, default: 0 },
     averageTimeSecs: { type: Number, default: 0 },
