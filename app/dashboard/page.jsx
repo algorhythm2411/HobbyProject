@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import SignOutButton from "@/components/SignOutButton";
-import DashboardStats from "@/components/dashboard/DashboardStats";
+import DashboardStats from "@/components/DashboardStats";
 
 export const metadata = { title: "Dashboard · DILR Arena" };
 
