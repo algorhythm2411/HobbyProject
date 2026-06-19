@@ -51,7 +51,6 @@ export default function SolvePage({ params }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [outOfLives, setOutOfLives] = useState(null); // { livesRefillsAt } | null
 
   const startedAtRef = useRef(null);
   const submittedRef = useRef(false);
@@ -99,13 +98,6 @@ export default function SolvePage({ params }) {
           body: JSON.stringify({ setId, answers: payloadAnswers, timeTakenSeconds, timedOut }),
         });
 
-        if (res.status === 403) {
-          const data = await res.json();
-          setOutOfLives({ livesRefillsAt: data.livesRefillsAt });
-          submittedRef.current = false;
-          setSubmitting(false);
-          return;
-        }
         if (!res.ok) throw new Error("Submission failed");
 
         const data = await res.json();
@@ -137,26 +129,6 @@ export default function SolvePage({ params }) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
         <p className="text-slate-500">Loading set…</p>
-      </div>
-    );
-  }
-
-  if (outOfLives) {
-    const refillsAt = outOfLives.livesRefillsAt ? new Date(outOfLives.livesRefillsAt) : null;
-    return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-6">
-        <div className="text-center max-w-sm">
-          <p className="text-5xl mb-4">💔</p>
-          <h1 className="text-xl font-bold mb-2">Out of lives</h1>
-          <p className="text-slate-400 mb-6">
-            {refillsAt
-              ? `Your lives refill at ${refillsAt.toLocaleTimeString()}.`
-              : "Your lives are refilling — check back shortly."}
-          </p>
-          <Link href="/dashboard" className="text-indigo-400 hover:text-indigo-300 text-sm">
-            ← Back to dashboard
-          </Link>
-        </div>
       </div>
     );
   }
