@@ -80,8 +80,8 @@ export default function ResultPage() {
         <p className="text-xs text-slate-500 uppercase tracking-widest mb-2">
           {result.category} · {result.setTitle}
         </p>
-        <h1 className="text-3xl font-bold mb-1">
-          +{result.totalXP} XP
+        <h1 className={`text-3xl font-bold mb-1 ${result.totalXP < 0 ? "text-red-400" : ""}`}>
+          {result.totalXP > 0 ? "+" : ""}{result.totalXP} XP
         </h1>
         <p className="text-slate-400 mb-8">
           {result.timedOut ? "Time ran out — " : ""}
@@ -148,9 +148,10 @@ export default function ResultPage() {
           </div>
         </div>
 
-        {result.livesLost > 0 && (
+      {result.totalXP < 0 && (
           <p className="text-sm text-red-400 mb-6">
-            💔 Lost {result.livesLost} {result.livesLost === 1 ? "life" : "lives"} from wrong answers.
+            ⚠️ Net negative XP this attempt — wrong answers cost more than correct
+            ones earned. Negative marking applies here just like the real CAT.
           </p>
         )}
 
