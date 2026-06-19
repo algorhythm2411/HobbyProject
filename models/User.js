@@ -7,11 +7,6 @@ const UserSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     image: String,
 
-    // Email/password auth
-    passwordHash: { type: String, default: null, select: false },
-    emailVerifiedAt: { type: Date, default: null },
-    authProvider: { type: String, enum: ["google", "email"], default: "google" },
-
     // ── Game stats ────────────────────────────────────────────────────────────
     xp: { type: Number, default: 0 },
     level: { type: Number, default: 1, min: 1, max: 6 },
@@ -19,12 +14,12 @@ const UserSchema = new mongoose.Schema(
     // ── Streaks ───────────────────────────────────────────────────────────────
     currentStreak: { type: Number, default: 0 },
     longestStreak: { type: Number, default: 0 },
-    lastSolvedDate: { type: Date, default: null },
+    lastSolvedDate: { type: Date, default: null }, // UTC date of last solved set
 
     // ── Aggregate accuracy stats ──────────────────────────────────────────────
     totalSetsSolved: { type: Number, default: 0 },
     totalCorrect: { type: Number, default: 0 },
-    totalAttempted: { type: Number, default: 0 },
+    totalAttempted: { type: Number, default: 0 }, // questions attempted (not skipped)
 
     // ── Badges ────────────────────────────────────────────────────────────────
     badges: { type: [String], default: [] },
@@ -40,7 +35,8 @@ const UserSchema = new mongoose.Schema(
 );
 
 // ── Indexes ───────────────────────────────────────────────────────────────────
-UserSchema.index({ xp: -1 });
+UserSchema.index({ xp: -1 });   // all-time leaderboard
+// Note: email index created automatically by unique: true
 
 // ── Virtuals ──────────────────────────────────────────────────────────────────
 UserSchema.virtual("accuracyPercent").get(function () {
