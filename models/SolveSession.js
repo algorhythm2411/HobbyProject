@@ -42,7 +42,6 @@ const SolveSessionSchema = new mongoose.Schema(
 
     // ── Context ───────────────────────────────────────────────────────────────
     isSetOfTheDay: { type: Boolean, default: false },
-    livesLost: { type: Number, default: 0 }, // wrong answers consume lives
   },
   { timestamps: true }
 );
