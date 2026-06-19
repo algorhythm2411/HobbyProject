@@ -24,14 +24,14 @@ function hashPassword(password) {
 
 export async function POST(req) {
   try {
-    const authHeader = req.headers.get("authorization") || "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const { email, password, name } = await req.json();
 
-    if (!token) {
-      return NextResponse.json({ error: "Missing Supabase access token" }, { status: 401 });
+    const normalizedEmail = normalizeEmail(email);
+    const trimmedName = String(name || "").trim() || deriveNameFromEmail(normalizedEmail);
+
+    if (!normalizedEmail) {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
-
-    const { password, name } = await req.json();
 
     if (!password || password.length < 6) {
       return NextResponse.json(
@@ -40,31 +40,33 @@ export async function POST(req) {
       );
     }
 
-    const supabaseUrl =
-      process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey =
-      process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseAnonKey) {
       return NextResponse.json(
-        { error: "Supabase env vars are missing" },
+        { error: "Missing Supabase environment variables" },
         { status: 500 }
       );
     }
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
-    const { data, error } = await supabase.auth.getUser(token);
 
-    if (error || !data?.user?.email) {
-      return NextResponse.json({ error: "Invalid or expired OTP session" }, { status: 401 });
+    const { error: authError } = await supabase.auth.signUp({
+      email: normalizedEmail,
+      password,
+      options: {
+        emailRedirectTo: process.env.NEXTAUTH_URL || "http://localhost:3000",
+      },
+    });
+
+    if (authError) {
+      return NextResponse.json({ error: authError.message }, { status: 400 });
     }
-
-    const email = normalizeEmail(data.user.email);
-    const displayName = String(name || "").trim() || deriveNameFromEmail(email);
 
     await dbConnect();
 
-    const existing = await User.findOne({ email }).select("+passwordHash +authProvider");
+    const existing = await User.findOne({ email: normalizedEmail }).select("+passwordHash");
 
     if (existing?.passwordHash) {
       return NextResponse.json(
@@ -73,28 +75,33 @@ export async function POST(req) {
       );
     }
 
-    if (existing) {
-      existing.name = existing.name || displayName;
-      existing.passwordHash = hashPassword(password);
-      existing.emailVerifiedAt = existing.emailVerifiedAt || new Date();
-      existing.authProvider = "email";
-      await existing.save();
+    const passwordHash = hashPassword(password);
 
-      return NextResponse.json({ ok: true, created: false });
+    if (existing) {
+      existing.name = existing.name || trimmedName;
+      existing.passwordHash = passwordHash;
+      existing.authProvider = "email";
+      existing.emailVerifiedAt = null;
+      await existing.save();
+    } else {
+      await User.create({
+        name: trimmedName,
+        email: normalizedEmail,
+        passwordHash,
+        authProvider: "email",
+        emailVerifiedAt: null,
+      });
     }
 
-    await User.create({
-      name: displayName,
-      email,
-      passwordHash: hashPassword(password),
-      emailVerifiedAt: new Date(),
-      authProvider: "email",
-      image: data.user.user_metadata?.avatar_url || null,
+    return NextResponse.json({
+      ok: true,
+      message: "Account created. Verification email sent.",
     });
-
-    return NextResponse.json({ ok: true, created: true });
   } catch (err) {
     console.error("[POST /api/auth/email/register]", err);
-    return NextResponse.json({ error: "Failed to register account" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create account" },
+      { status: 500 }
+    );
   }
 }
