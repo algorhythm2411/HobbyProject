@@ -9,7 +9,6 @@ import { calculateScore } from "@/lib/scoring";
 import { getLevelFromXP } from "@/lib/levels";
 import mongoose from "mongoose";
 
-const LIVES_REFILL_MS = 60 * 60 * 1000; // 1 hour
 const REPEAT_XP_FACTOR = 0.2; // re-solving an already-solved set earns 20% XP (anti-farming)
 
 function utcDateOnly(date) {
@@ -62,22 +61,7 @@ export async function POST(req) {
     if (!dilrSet) return NextResponse.json({ error: "Set not found" }, { status: 404 });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-    // ── Lives gate ──────────────────────────────────────────────────────────
     const now = new Date();
-    if (user.lives <= 0) {
-      if (user.livesRefillsAt && now >= user.livesRefillsAt) {
-        user.lives = 5;
-        user.livesRefillsAt = null;
-      } else {
-        return NextResponse.json(
-          {
-            error: "OUT_OF_LIVES",
-            livesRefillsAt: user.livesRefillsAt,
-          },
-          { status: 403 }
-        );
-      }
-    }
 
     // ── Was this set already solved by this user before? ──────────────────
     const isRepeat = Boolean(
@@ -123,13 +107,6 @@ export async function POST(req) {
 
     const awardedXP = isRepeat ? Math.round(score.totalXP * REPEAT_XP_FACTOR) : score.totalXP;
 
-    // ── Lives cost ──────────────────────────────────────────────────────────
-    const livesLost = Math.min(user.lives, score.wrong);
-    user.lives -= livesLost;
-    if (user.lives === 0 && !user.livesRefillsAt) {
-      user.livesRefillsAt = new Date(now.getTime() + LIVES_REFILL_MS);
-    }
-
     // ── User aggregate stats ──────────────────────────────────────────────
     const prevXP = user.xp;
     user.xp += awardedXP;
@@ -172,7 +149,6 @@ export async function POST(req) {
       streakMultiplier: score.streakMultiplier,
       totalXP: awardedXP,
       isSetOfTheDay: dilrSet.isSetOfTheDay,
-      livesLost,
     });
 
     const newLevelInfo = getLevelFromXP(user.xp);
@@ -183,8 +159,6 @@ export async function POST(req) {
       isRepeat,
       score: { ...score, totalXP: awardedXP },
       streak: newStreak,
-      lives: user.lives,
-      livesRefillsAt: user.livesRefillsAt,
       xp: user.xp,
       level: newLevelInfo,
       leveledUp,
@@ -253,7 +227,6 @@ export async function GET(req) {
       perfectBonus: solveSession.perfectBonus,
       streakMultiplier: solveSession.streakMultiplier,
       totalXP: solveSession.totalXP,
-      livesLost: solveSession.livesLost,
       breakdown,
     });
   } catch (err) {
