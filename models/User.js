@@ -16,10 +16,6 @@ const UserSchema = new mongoose.Schema(
     longestStreak: { type: Number, default: 0 },
     lastSolvedDate: { type: Date, default: null }, // UTC date of last solved set
 
-    // ── Lives (resets to 5 every hour if depleted) ────────────────────────────
-    lives: { type: Number, default: 5, min: 0, max: 5 },
-    livesRefillsAt: { type: Date, default: null },
-
     // ── Aggregate accuracy stats ──────────────────────────────────────────────
     totalSetsSolved: { type: Number, default: 0 },
     totalCorrect: { type: Number, default: 0 },
