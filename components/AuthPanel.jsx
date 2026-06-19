@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
+
+const supabase = getSupabaseBrowserClient();
 
 function GoogleIcon() {
   return (
@@ -32,7 +35,7 @@ function Field({ label, ...props }) {
       <span className="mb-1.5 block text-sm font-medium text-slate-200">{label}</span>
       <input
         {...props}
-        className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-indigo-500 disabled:opacity-60"
+        className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-indigo-500"
       />
     </label>
   );
@@ -43,13 +46,18 @@ export default function AuthPanel() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  // Sign in form
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
+  // Sign up flow
+  const [signupStage, setSignupStage] = useState("email"); // email -> otp -> password
   const [signupEmail, setSignupEmail] = useState("");
+  const [signupOtp, setSignupOtp] = useState("");
   const [signupName, setSignupName] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirm, setSignupConfirm] = useState("");
+  const [verifiedSession, setVerifiedSession] = useState(null);
 
   const clearStatus = () => {
     setError("");
@@ -77,14 +85,68 @@ export default function AuthPanel() {
       if (res?.error) {
         setError("Invalid email or password.");
       }
-    } catch (err) {
-      setError(err?.message || "Failed to sign in.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function handleEmailSignUp(e) {
+  async function sendOtp(e) {
+    e.preventDefault();
+    clearStatus();
+    setBusy(true);
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: signupEmail,
+      });
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      setSignupStage("otp");
+      setMessage("OTP sent to your email.");
+    } catch (err) {
+      setError(err.message || "Failed to send OTP.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyOtp(e) {
+    e.preventDefault();
+    clearStatus();
+    setBusy(true);
+
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: signupEmail,
+        token: signupOtp,
+        type: "email",
+      });
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      if (!data?.session?.access_token) {
+        setError("OTP verified, but no session was returned.");
+        return;
+      }
+
+      setVerifiedSession(data.session);
+      setSignupStage("password");
+      setMessage("Email verified. Set your password now.");
+    } catch (err) {
+      setError(err.message || "OTP verification failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createAccount(e) {
     e.preventDefault();
     clearStatus();
 
@@ -101,11 +163,18 @@ export default function AuthPanel() {
     setBusy(true);
 
     try {
+      if (!verifiedSession?.access_token) {
+        setError("Please verify your email first.");
+        return;
+      }
+
       const res = await fetch("/api/auth/email/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${verifiedSession.access_token}`,
+        },
         body: JSON.stringify({
-          email: signupEmail,
           password: signupPassword,
           name: signupName,
         }),
@@ -114,15 +183,20 @@ export default function AuthPanel() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Failed to create account.");
+        setError(data.error || "Registration failed.");
         return;
       }
 
-      setMessage("Account created. Check your email to confirm it.");
-      setSignupPassword("");
-      setSignupConfirm("");
+      await supabase.auth.signOut();
+
+      await signIn("credentials", {
+        email: signupEmail,
+        password: signupPassword,
+        callbackUrl: "/dashboard",
+        redirect: true,
+      });
     } catch (err) {
-      setError(err?.message || "Failed to create account.");
+      setError(err.message || "Registration failed.");
     } finally {
       setBusy(false);
     }
@@ -130,6 +204,7 @@ export default function AuthPanel() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      {/* Google + email sign-in */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -183,11 +258,12 @@ export default function AuthPanel() {
         </form>
       </div>
 
+      {/* Email sign-up flow */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-white">Sign up</h3>
-            <p className="text-sm text-slate-400">Create your account with email and password.</p>
+            <p className="text-sm text-slate-400">Verify your email, then set a password.</p>
           </div>
           <span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400">
             New users
@@ -206,46 +282,98 @@ export default function AuthPanel() {
           </p>
         ) : null}
 
-        <form onSubmit={handleEmailSignUp} className="mt-5 space-y-4">
-          <Field
-            label="Email"
-            type="email"
-            value={signupEmail}
-            onChange={(e) => setSignupEmail(e.target.value)}
-            placeholder="you@example.com"
-            required
-          />
-          <Field
-            label="Display name"
-            type="text"
-            value={signupName}
-            onChange={(e) => setSignupName(e.target.value)}
-            placeholder="Optional"
-          />
-          <Field
-            label="Password"
-            type="password"
-            value={signupPassword}
-            onChange={(e) => setSignupPassword(e.target.value)}
-            placeholder="Create password"
-            required
-          />
-          <Field
-            label="Retype password"
-            type="password"
-            value={signupConfirm}
-            onChange={(e) => setSignupConfirm(e.target.value)}
-            placeholder="Retype password"
-            required
-          />
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Create account
-          </button>
-        </form>
+        <div className="mt-5 space-y-4">
+          {signupStage === "email" && (
+            <form onSubmit={sendOtp} className="space-y-4">
+              <Field
+                label="Email"
+                type="email"
+                value={signupEmail}
+                onChange={(e) => setSignupEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+              />
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Send OTP
+              </button>
+            </form>
+          )}
+
+          {signupStage === "otp" && (
+            <form onSubmit={verifyOtp} className="space-y-4">
+              <Field
+                label="Email"
+                type="email"
+                value={signupEmail}
+                disabled
+              />
+              <Field
+                label="OTP"
+                type="text"
+                value={signupOtp}
+                onChange={(e) => setSignupOtp(e.target.value)}
+                placeholder="Enter the code from your email"
+                required
+              />
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="flex-1 rounded-xl bg-indigo-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Verify OTP
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setSignupStage("email")}
+                  className="rounded-xl border border-slate-800 px-4 py-3 text-sm font-medium text-slate-300 hover:bg-slate-950"
+                >
+                  Back
+                </button>
+              </div>
+            </form>
+          )}
+
+          {signupStage === "password" && (
+            <form onSubmit={createAccount} className="space-y-4">
+              <Field
+                label="Display name"
+                type="text"
+                value={signupName}
+                onChange={(e) => setSignupName(e.target.value)}
+                placeholder="Optional"
+              />
+              <Field
+                label="Password"
+                type="password"
+                value={signupPassword}
+                onChange={(e) => setSignupPassword(e.target.value)}
+                placeholder="Create password"
+                required
+              />
+              <Field
+                label="Retype password"
+                type="password"
+                value={signupConfirm}
+                onChange={(e) => setSignupConfirm(e.target.value)}
+                placeholder="Retype password"
+                required
+              />
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Create account
+              </button>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );
