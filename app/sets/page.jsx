@@ -51,37 +51,49 @@ function SetCard({ set }) {
   return (
     <Link
       href={`/solve/${set.id}`}
-      className="block bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-indigo-500/40 transition-colors"
+      className="block bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-indigo-500/40 transition-colors"
     >
-      <div className="flex items-center justify-between mb-3">
-        <span
-          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-            set.category === "DI"
-              ? "bg-sky-500/10 text-sky-300"
-              : "bg-purple-500/10 text-purple-300"
-          }`}
-        >
-          {set.category} · {set.type}
-        </span>
-        {set.isSetOfTheDay && (
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-300">
-            ⭐ Today
+      {set.images && set.images.length > 0 && (
+        <div className="relative w-full h-40 bg-slate-800 overflow-hidden">
+          <img
+            src={set.images[0].url}
+            alt={set.images[0].alt || "Set thumbnail"}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
+
+      <div className="p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span
+            className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+              set.category === "DI"
+                ? "bg-sky-500/10 text-sky-300"
+                : "bg-purple-500/10 text-purple-300"
+            }`}
+          >
+            {set.category} · {set.type}
           </span>
-        )}
-      </div>
+          {set.isSetOfTheDay && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-300">
+              ⭐ Today
+            </span>
+          )}
+        </div>
 
-      <h3 className="font-semibold text-slate-100 mb-3 leading-snug">{set.title}</h3>
+        <h3 className="font-semibold text-slate-100 mb-3 leading-snug">{set.title}</h3>
 
-      <div className="flex items-center justify-between text-sm text-slate-400">
-        <DifficultyDots level={set.difficulty} />
-        <span>⏱️ {minutes} min</span>
-      </div>
+        <div className="flex items-center justify-between text-sm text-slate-400">
+          <DifficultyDots level={set.difficulty} />
+          <span>⏱️ {minutes} min</span>
+        </div>
 
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-800/70 text-xs text-slate-500">
-        <span>{set.questionCount} questions</span>
-        <span>
-          {set.communityRating > 0 ? `★ ${set.communityRating.toFixed(1)}` : "Not yet rated"}
-        </span>
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-800/70 text-xs text-slate-500">
+          <span>{set.questionCount} questions</span>
+          <span>
+            {set.communityRating > 0 ? `★ ${set.communityRating.toFixed(1)}` : "Not yet rated"}
+          </span>
+        </div>
       </div>
     </Link>
   );

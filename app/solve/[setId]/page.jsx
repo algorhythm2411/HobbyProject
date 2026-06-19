@@ -210,6 +210,26 @@ export default function SolvePage({ params }) {
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-8">
           <p className="text-slate-300 leading-relaxed whitespace-pre-wrap mb-4">{set.passage}</p>
           <DataTable table={set.dataTable} />
+
+          {set.images && set.images.length > 0 && (
+            <div className="mt-6 space-y-4">
+              <p className="text-sm font-semibold text-slate-400 mb-3">Attached Images</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {set.images.map((img, index) => (
+                  <div key={index} className="rounded-lg overflow-hidden border border-slate-700">
+                    <img
+                      src={img.url}
+                      alt={img.alt || `Image ${index + 1}`}
+                      className="w-full h-auto object-contain bg-slate-800 max-h-96"
+                    />
+                    {img.alt && (
+                      <p className="text-xs text-slate-400 p-2 bg-slate-800">{img.alt}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">

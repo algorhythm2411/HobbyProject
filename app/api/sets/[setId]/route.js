@@ -56,6 +56,7 @@ export async function GET(_req, { params }) {
       passage: set.passage,
       dataTable: set.dataTable ?? null,
       questions: sanitizedQuestions,
+      images: set.images ?? [],
       isSetOfTheDay: set.isSetOfTheDay,
       alreadySolved: Boolean(alreadySolved),
     });

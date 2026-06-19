@@ -40,7 +40,7 @@ const UserSchema = new mongoose.Schema(
 
 // ── Indexes ───────────────────────────────────────────────────────────────────
 UserSchema.index({ xp: -1 });   // all-time leaderboard
-UserSchema.index({ email: 1 }); // auth lookups
+// Note: email index created automatically by unique: true
 
 // ── Virtuals ──────────────────────────────────────────────────────────────────
 UserSchema.virtual("accuracyPercent").get(function () {

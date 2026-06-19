@@ -47,7 +47,7 @@ export async function GET(req) {
         .skip((page - 1) * limit)
         .limit(limit)
         .select(
-          "title category type source year slot difficulty timeLimit communityRating ratingCount timesAttempted isSetOfTheDay tags questions createdAt"
+          "title category type source year slot difficulty timeLimit communityRating ratingCount timesAttempted isSetOfTheDay tags questions createdAt images"
         )
         .lean(),
     ]);
@@ -67,6 +67,7 @@ export async function GET(req) {
       timesAttempted: d.timesAttempted,
       isSetOfTheDay: d.isSetOfTheDay,
       tags: d.tags,
+      images: d.images ?? [],
       questionCount: d.questions?.length ?? 0,
       createdAt: d.createdAt,
     }));

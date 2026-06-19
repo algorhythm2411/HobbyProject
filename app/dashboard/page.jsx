@@ -55,6 +55,14 @@ export default async function Dashboard() {
           >
             🏆 Leaderboard
           </a>
+          {session.user.role === "admin" && (
+            <a
+              href="/admin"
+              className="px-6 py-3 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold transition-colors"
+            >
+              ⚙️ Create DILR Set
+            </a>
+          )}
         </div>
 
         {/* Phase checklist */}

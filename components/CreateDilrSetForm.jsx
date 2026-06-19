@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const emptyQuestion = () => ({
   questionNumber: 1,
@@ -12,11 +13,14 @@ const emptyQuestion = () => ({
 
 const emptyImage = () => ({
   url: "",
-  path: "",
   alt: "",
+  file: null,
+  preview: "",
+  uploading: false,
 });
 
 export default function CreateDilrSetForm() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
@@ -110,6 +114,53 @@ export default function CreateDilrSetForm() {
     });
   }
 
+  async function handleImageUpload(index, file) {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      updateImage(index, "preview", e.target.result);
+    };
+    reader.readAsDataURL(file);
+
+    // Mark as uploading
+    updateImage(index, "uploading", true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("alt", form.images[index].alt || "");
+
+      const res = await fetch("/api/admin/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Upload failed");
+      }
+
+      // Update with returned URL
+      updateImage(index, "url", data.url);
+      updateImage(index, "alt", data.alt);
+      updateImage(index, "uploading", false);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Image upload failed");
+      updateImage(index, "uploading", false);
+      updateImage(index, "preview", "");
+    }
+  }
+
   function removeImage(index) {
     setForm((prev) => ({
       ...prev,
@@ -120,6 +171,23 @@ export default function CreateDilrSetForm() {
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
+
+    // Validate required fields
+    if (!form.title.trim()) {
+      alert("Title is required");
+      setLoading(false);
+      return;
+    }
+    if (!form.passage.trim()) {
+      alert("Passage/Scenario is required");
+      setLoading(false);
+      return;
+    }
+    if (form.questions.length === 0) {
+      alert("At least one question is required");
+      setLoading(false);
+      return;
+    }
 
     try {
       const payload = {
@@ -153,10 +221,9 @@ export default function CreateDilrSetForm() {
         images: form.images
           .map((img) => ({
             url: img.url.trim(),
-            path: img.path.trim(),
             alt: img.alt.trim(),
           }))
-          .filter((img) => img.url || img.path || img.alt),
+          .filter((img) => img.url),
       };
 
       const res = await fetch("/api/admin/dilr-sets", {
@@ -473,26 +540,60 @@ export default function CreateDilrSetForm() {
                   </button>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                  <Field label="URL">
-                    <input
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none"
-                      value={img.url}
-                      onChange={(e) => updateImage(index, "url", e.target.value)}
-                    />
+                <div className="space-y-4">
+                  <Field label="Image File">
+                    <label className="block">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={img.uploading}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleImageUpload(index, file);
+                          }
+                        }}
+                        className="block w-full text-sm text-slate-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-xl file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-slate-100 file:text-slate-900
+                          hover:file:bg-slate-200
+                          disabled:opacity-60 disabled:cursor-not-allowed"
+                      />
+                    </label>
                   </Field>
 
-                  <Field label="Path">
-                    <input
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none"
-                      value={img.path}
-                      onChange={(e) => updateImage(index, "path", e.target.value)}
-                    />
-                  </Field>
+                  {img.preview && (
+                    <div className="mt-3">
+                      <p className="mb-2 text-sm font-medium text-slate-700">Preview:</p>
+                      <img
+                        src={img.preview}
+                        alt="Preview"
+                        className="max-h-48 rounded-xl border border-slate-300"
+                      />
+                    </div>
+                  )}
 
-                  <Field label="Alt Text">
+                  {img.uploading && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
+                      Uploading...
+                    </div>
+                  )}
+
+                  {img.url && (
+                    <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
+                      ✓ Uploaded to Supabase
+                    </div>
+                  )}
+
+                  <Field label="Alt Text (for accessibility)">
                     <input
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none"
+                      type="text"
+                      placeholder="Description of the image"
+                      disabled={img.uploading}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder-slate-400 outline-none disabled:opacity-60"
                       value={img.alt}
                       onChange={(e) => updateImage(index, "alt", e.target.value)}
                     />
@@ -504,12 +605,22 @@ export default function CreateDilrSetForm() {
         )}
       </div>
 
-      <button
-        disabled={loading}
-        className="rounded-2xl bg-slate-900 px-6 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {loading ? "Creating..." : "Create DILR Set"}
-      </button>
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard")}
+          disabled={loading}
+          className="flex-1 rounded-2xl border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          ← Back to Dashboard
+        </button>
+        <button
+          disabled={loading}
+          className="flex-1 rounded-2xl bg-slate-900 px-6 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? "Creating..." : "Create DILR Set"}
+        </button>
+      </div>
     </form>
   );
 }
