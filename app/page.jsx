@@ -1,11 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import dbConnect from "@/lib/mongodb";
-import User from "@/models/User";
-import { getLevelFromXP } from "@/lib/levels";
 import SignInButton from "@/components/SignInButton";
-import AuthPanel from "@/components/AuthPanel";
 
 // ── Static data ───────────────────────────────────────────────────────────────
 
@@ -42,6 +38,15 @@ const FEATURES = [
   },
 ];
 
+// Sample data to show social proof on the landing page
+const SAMPLE_LEADERBOARD = [
+  { rank: 1, name: "Arjun Sharma",  xp: 3240, level: "Challenger", streak: 14, medal: "🥇" },
+  { rank: 2, name: "Priya Nair",    xp: 2980, level: "Challenger", streak: 9,  medal: "🥈" },
+  { rank: 3, name: "Rohan Gupta",   xp: 2710, level: "Challenger", streak: 7,  medal: "🥉" },
+  { rank: 4, name: "Sneha Patil",   xp: 2450, level: "Learner",    streak: 12, medal: null },
+  { rank: 5, name: "Dev Mehta",     xp: 2190, level: "Learner",    streak: 5,  medal: null },
+];
+
 const LEVEL_BADGES = [
   "🌱 Rookie",
   "📚 Learner",
@@ -51,43 +56,15 @@ const LEVEL_BADGES = [
   "👑 Mastermind",
 ];
 
-function deriveNameFromEmail(email) {
-  const local = String(email || "").split("@")[0] || "user";
-  return local
-    .replace(/[._-]+/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-    .trim();
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function LandingPage() {
   const session = await getServerSession(authOptions);
   if (session) redirect("/dashboard");
 
-  await dbConnect();
-
-  const topDocs = await User.find({})
-    .sort({ xp: -1, currentStreak: -1, createdAt: 1 })
-    .limit(5)
-    .select("name email xp currentStreak")
-    .lean();
-
-  const topUsers = topDocs.map((u, index) => {
-    const lvl = getLevelFromXP(u.xp || 0);
-    return {
-      rank: index + 1,
-      name: u.name || deriveNameFromEmail(u.email),
-      xp: u.xp || 0,
-      streak: u.currentStreak || 0,
-      levelName: lvl.name,
-      levelEmoji: lvl.emoji,
-      medal: index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : null,
-    };
-  });
-
   return (
     <div className="min-h-screen bg-slate-950 text-white">
+
       {/* ── Navbar ── */}
       <nav className="flex items-center justify-between px-6 py-4 border-b border-slate-800 max-w-6xl mx-auto">
         <div className="flex items-center gap-2.5">
@@ -99,6 +76,7 @@ export default async function LandingPage() {
 
       {/* ── Hero ── */}
       <section className="text-center px-6 py-20 md:py-28 max-w-4xl mx-auto">
+        {/* Live badge */}
         <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full px-4 py-1.5 mb-8">
           <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" aria-hidden="true" />
           <span className="text-indigo-300 text-sm font-medium">Live leaderboard · 100+ DILR sets</span>
@@ -114,6 +92,12 @@ export default async function LandingPage() {
           The most addictive way to prep for CAT&apos;s hardest section.
         </p>
 
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <SignInButton large />
+          <span className="text-slate-500 text-sm">Free · No credit card</span>
+        </div>
+
+        {/* Level progression badges */}
         <div className="flex flex-wrap items-center justify-center gap-2 mt-12 opacity-50">
           {LEVEL_BADGES.map((badge) => (
             <span
@@ -126,54 +110,42 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ── Auth ── */}
-      <section id="auth" className="px-6 pb-20 max-w-6xl mx-auto">
-        <AuthPanel />
-      </section>
-
       {/* ── Leaderboard preview ── */}
       <section className="px-6 pb-20 max-w-lg mx-auto">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800">
-            <span className="text-sm font-semibold text-slate-200">🏆 Top 5 right now</span>
+            <span className="text-sm font-semibold text-slate-200">🏆 This week</span>
             <span className="flex items-center gap-1.5 text-xs text-emerald-400">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
               Live
             </span>
           </div>
 
-          {topUsers.length === 0 ? (
-            <div className="px-5 py-10 text-center">
-              <p className="text-slate-300 font-medium">No leaderboard data yet.</p>
-              <p className="text-slate-500 text-sm mt-1">Be the first to solve a set and claim the board.</p>
-            </div>
-          ) : (
-            topUsers.map((u) => (
-              <div
-                key={`${u.rank}-${u.name}`}
-                className={`flex items-center gap-4 px-5 py-3.5 border-b border-slate-800/50 last:border-0 ${
-                  u.rank === 1 ? "bg-amber-400/5" : ""
-                }`}
-              >
-                <span className="w-8 text-center font-bold">
-                  {u.medal ? (
-                    <span>{u.medal}</span>
-                  ) : (
-                    <span className="text-slate-600 text-sm">#{u.rank}</span>
-                  )}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-200 truncate">{u.name}</p>
-                  <p className="text-xs text-slate-500">
-                    {u.levelEmoji} {u.levelName} · 🔥 {u.streak} day streak
-                  </p>
-                </div>
-                <span className="text-indigo-400 font-semibold text-sm tabular-nums">
-                  {u.xp.toLocaleString()} XP
-                </span>
+          {SAMPLE_LEADERBOARD.map((u) => (
+            <div
+              key={u.rank}
+              className={`flex items-center gap-4 px-5 py-3.5 border-b border-slate-800/50 last:border-0 ${
+                u.rank === 1 ? "bg-amber-400/5" : ""
+              }`}
+            >
+              <span className="w-8 text-center font-bold">
+                {u.medal ? (
+                  <span>{u.medal}</span>
+                ) : (
+                  <span className="text-slate-600 text-sm">#{u.rank}</span>
+                )}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-200 truncate">{u.name}</p>
+                <p className="text-xs text-slate-500">
+                  {u.level} · 🔥 {u.streak} day streak
+                </p>
               </div>
-            ))
-          )}
+              <span className="text-indigo-400 font-semibold text-sm tabular-nums">
+                {u.xp.toLocaleString()} XP
+              </span>
+            </div>
+          ))}
 
           <div className="px-5 py-3 text-center text-xs text-slate-500">
             Sign in to see your rank and compete →
@@ -211,16 +183,12 @@ export default async function LandingPage() {
         <p className="text-slate-400 mb-8 text-lg">
           Join CAT aspirants competing daily.
         </p>
-        <a
-          href="#auth"
-          className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-3 text-base font-medium text-slate-800 hover:bg-slate-100 transition-colors"
-        >
-          Sign in or sign up
-        </a>
+        <SignInButton large />
         <p className="text-slate-600 text-xs mt-4">
-          DILR Arena is free. Built for CAT aspirants.
+          DILR Arena is free. Built for CAT 2025 aspirants.
         </p>
       </section>
+
     </div>
   );
 }
